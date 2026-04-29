@@ -17,6 +17,10 @@ DEFAULT_CATEGORIES = [
     ("Life", "🏠"),
     ("Challenges", "💪"),
     ("Romance", "💌"),
+    ("Shopping", "🛍️"),
+    ("Gifts", "🎁"),
+    ("Learning", "📚"),
+    ("Health", "🧘"),
 ]
 
 
@@ -74,13 +78,11 @@ def init_db():
         );
     """)
 
-    # Seed categories if empty
-    cursor.execute("SELECT COUNT(*) FROM categories")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany(
-            "INSERT INTO categories (name, emoji) VALUES (?, ?)",
-            DEFAULT_CATEGORIES,
-        )
+    # Insert any missing default categories (idempotent — name is UNIQUE)
+    cursor.executemany(
+        "INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)",
+        DEFAULT_CATEGORIES,
+    )
 
     conn.commit()
     conn.close()
