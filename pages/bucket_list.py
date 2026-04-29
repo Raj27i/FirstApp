@@ -1,5 +1,6 @@
 """Dreams page — card grid, chip filters, search."""
 
+import random
 import streamlit as st
 from db import get_categories
 from auth import get_current_partner
@@ -7,6 +8,7 @@ from goals import (
     add_goal, get_goals, vote_on_goal, complete_goal,
     delete_goal, has_partner_voted,
 )
+from presets import PRESET_IDEAS
 
 
 def render():
@@ -19,6 +21,9 @@ def render():
 
     with st.expander("➕ Add a new dream", expanded=False):
         _render_add_form(partner)
+
+    with st.expander("💡 Get inspired — one-click add", expanded=False):
+        _render_idea_gallery(partner)
 
     st.markdown("")
 
@@ -106,6 +111,67 @@ def _render_add_form(partner):
                 )
                 st.success("Dream added! ✨")
                 st.rerun()
+
+
+def _render_idea_gallery(partner):
+    categories = get_categories()
+    cat_lookup = {c["name"]: c for c in categories}
+
+    st.caption("Tap any idea to add it instantly to your dreams.")
+
+    # Category picker
+    cat_names = [c["name"] for c in categories if c["name"] in PRESET_IDEAS]
+    chip_labels = ["🎲 Surprise me"] + [
+        f"{cat_lookup[n]['emoji']} {n}" for n in cat_names
+    ]
+    pick = st.radio(
+        "Inspiration category",
+        chip_labels,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="idea_cat",
+    )
+
+    # Build the list of ideas to show
+    if pick == "🎲 Surprise me":
+        pool = []
+        for cname in cat_names:
+            for title, emoji in PRESET_IDEAS[cname]:
+                pool.append((title, emoji, cname))
+        random.seed(st.session_state.get("idea_seed", 0))
+        sample = random.sample(pool, min(8, len(pool)))
+        if st.button("🔀 Shuffle", key="idea_shuffle"):
+            st.session_state["idea_seed"] = random.randint(0, 10_000)
+            st.rerun()
+        ideas = sample
+    else:
+        cname = pick.split(" ", 1)[1]
+        ideas = [(t, e, cname) for t, e in PRESET_IDEAS.get(cname, [])]
+
+    if not ideas:
+        st.caption("No ideas in this category yet.")
+        return
+
+    # Render as a grid of clickable buttons
+    cols = st.columns(2)
+    for idx, (title, emoji, cname) in enumerate(ideas):
+        with cols[idx % 2]:
+            if st.button(
+                f"{emoji}  {title}",
+                key=f"idea_{cname}_{idx}_{title}",
+                use_container_width=True,
+            ):
+                cat = cat_lookup.get(cname)
+                if cat:
+                    add_goal(
+                        title=title,
+                        description="",
+                        category_id=cat["id"],
+                        added_by=partner["id"],
+                        goal_type="together",
+                    )
+                    st.toast(f"Added: {title} ✨")
+                    st.rerun()
 
 
 def _render_goal_card(goal, partner):
