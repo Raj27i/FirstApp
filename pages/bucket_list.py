@@ -1,11 +1,12 @@
-"""
-Bucket List Page — Add, browse, vote on, and complete goals.
-"""
+"""Dreams page — card grid, chip filters, search."""
 
 import streamlit as st
 from db import get_categories
-from auth import get_current_partner, get_other_partner
-from goals import add_goal, get_goals, vote_on_goal, complete_goal, delete_goal, has_partner_voted, get_votes_for_goal
+from auth import get_current_partner
+from goals import (
+    add_goal, get_goals, vote_on_goal, complete_goal,
+    delete_goal, has_partner_voted,
+)
 
 
 def render():
@@ -13,16 +14,67 @@ def render():
     if not partner:
         return
 
-    st.markdown("## 📝 Our Bucket List")
+    st.markdown("### 📝 Our Dreams")
+    st.caption("Big, small, wild, cozy — they all live here.")
 
-    # --- Add Goal Form ---
-    with st.expander("➕ Add a new goal", expanded=False):
+    with st.expander("➕ Add a new dream", expanded=False):
         _render_add_form(partner)
 
-    st.divider()
+    st.markdown("")
 
-    # --- Filters ---
-    _render_goal_feed(partner)
+    # Search bar
+    search = st.text_input(
+        "search",
+        placeholder="🔍 Search dreams...",
+        label_visibility="collapsed",
+        key="dream_search",
+    )
+
+    # Category chips
+    categories = get_categories()
+    cat_chips = ["All"] + [f"{c['emoji']} {c['name']}" for c in categories]
+    cat_chip = st.radio(
+        "Category", cat_chips,
+        horizontal=True, label_visibility="collapsed", key="cat_chip",
+    )
+
+    # Status chips
+    status_chips = ["All", "⏳ Pending", "✅ Approved", "🎉 Done"]
+    status_chip = st.radio(
+        "Status", status_chips,
+        horizontal=True, label_visibility="collapsed", key="status_chip",
+    )
+
+    # Resolve filters
+    cat_id = None
+    if cat_chip != "All":
+        cat_name = cat_chip.split(" ", 1)[1]
+        cat_id = next((c["id"] for c in categories if c["name"] == cat_name), None)
+
+    status_map = {"⏳ Pending": "pending", "✅ Approved": "approved", "🎉 Done": "completed"}
+    status = status_map.get(status_chip)
+
+    goals = get_goals(status=status, category_id=cat_id)
+    if search:
+        s = search.lower()
+        goals = [
+            g for g in goals
+            if s in g["title"].lower() or s in (g["description"] or "").lower()
+        ]
+
+    st.markdown("")
+
+    if not goals:
+        st.info("No dreams match. Add one above! 🗺️")
+        return
+
+    st.caption(f"**{len(goals)}** dream{'s' if len(goals) != 1 else ''}")
+
+    # Card grid (2 cols)
+    cols = st.columns(2)
+    for idx, goal in enumerate(goals):
+        with cols[idx % 2]:
+            _render_goal_card(goal, partner)
 
 
 def _render_add_form(partner):
@@ -30,153 +82,99 @@ def _render_add_form(partner):
     cat_options = {f"{c['emoji']} {c['name']}": c["id"] for c in categories}
 
     with st.form("add_goal_form", clear_on_submit=True):
-        title = st.text_input("Goal title", placeholder="e.g., Visit Tokyo together")
-        description = st.text_area("Description (optional)", placeholder="Why this matters to us...", height=80)
-
+        title = st.text_input("Dream title", placeholder="Watch sunrise from a mountain ⛰️")
+        description = st.text_area(
+            "Why this matters",
+            placeholder="What makes this special?",
+            height=70,
+        )
         col1, col2 = st.columns(2)
         with col1:
             cat_display = st.selectbox("Category", list(cat_options.keys()))
         with col2:
-            goal_type = st.selectbox("Type", ["together", "solo"], format_func=lambda x: "🤝 Together" if x == "together" else "🏃 Solo")
-
-        submitted = st.form_submit_button("Add Goal", use_container_width=True)
-
-        if submitted:
+            goal_type = st.selectbox(
+                "Type", ["together", "solo"],
+                format_func=lambda x: "🤝 Together" if x == "together" else "🏃 Solo",
+            )
+        if st.form_submit_button("Add Dream ✨", use_container_width=True, type="primary"):
             if not title.strip():
-                st.error("Give your goal a title!")
+                st.error("Give your dream a title!")
             else:
                 add_goal(
-                    title=title.strip(),
-                    description=description.strip(),
-                    category_id=cat_options[cat_display],
-                    added_by=partner["id"],
-                    goal_type=goal_type,
+                    title.strip(), description.strip(),
+                    cat_options[cat_display], partner["id"], goal_type,
                 )
-                st.success(f"Goal added! ✨")
+                st.success("Dream added! ✨")
                 st.rerun()
-
-
-def _render_goal_feed(partner):
-    # Filter bar
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        status_filter = st.selectbox(
-            "Status",
-            ["All", "pending", "approved", "completed"],
-            format_func=lambda x: {
-                "All": "📋 All Goals",
-                "pending": "⏳ Pending",
-                "approved": "✅ Approved",
-                "completed": "🎉 Completed",
-            }.get(x, x),
-        )
-
-    categories = get_categories()
-    cat_map = {"All": None}
-    cat_map.update({f"{c['emoji']} {c['name']}": c["id"] for c in categories})
-
-    with col2:
-        cat_filter = st.selectbox("Category", list(cat_map.keys()))
-
-    with col3:
-        partner_filter = st.selectbox(
-            "Added by",
-            ["Anyone", "Me", "My partner"],
-        )
-
-    # Build filters
-    status = None if status_filter == "All" else status_filter
-    category_id = cat_map[cat_filter]
-    added_by = None
-    if partner_filter == "Me":
-        added_by = partner["id"]
-    elif partner_filter == "My partner":
-        other = get_other_partner()
-        added_by = other["id"] if other else None
-
-    goals = get_goals(status=status, category_id=category_id, added_by=added_by)
-
-    if not goals:
-        st.info("No goals found. Add your first adventure! 🗺️")
-        return
-
-    st.markdown(f"**{len(goals)} goal{'s' if len(goals) != 1 else ''}**")
-
-    for goal in goals:
-        _render_goal_card(goal, partner)
 
 
 def _render_goal_card(goal, partner):
-    status_badges = {
+    status_pill = {
         "pending": "⏳ Pending",
         "approved": "✅ Approved",
-        "completed": "🎉 Completed",
-    }
-    type_badge = "🤝" if goal["goal_type"] == "together" else "🏃"
+        "completed": "🎉 Done",
+    }.get(goal["status"], goal["status"])
+    type_icon = "🤝" if goal["goal_type"] == "together" else "🏃"
 
     with st.container(border=True):
-        # Header row
-        col_main, col_status = st.columns([4, 1])
-        with col_main:
-            st.markdown(
-                f"### {goal['category_emoji']} {goal['title']}"
-            )
-        with col_status:
-            st.caption(status_badges.get(goal["status"], goal["status"]))
-
-        # Meta info
+        st.markdown(
+            f"<div style='font-size:2.5rem; line-height:1; margin-bottom:4px;'>"
+            f"{goal['category_emoji']}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"#### {goal['title']}")
         st.caption(
-            f"{type_badge} {goal['goal_type'].title()} · "
-            f"Added by {goal['partner_avatar']} {goal['partner_name']} · "
-            f"{goal['category_emoji']} {goal['category_name']}"
+            f"{status_pill} · {type_icon} {goal['goal_type'].title()} · "
+            f"by {goal['partner_avatar']} {goal['partner_name']}"
         )
 
         if goal["description"]:
-            st.markdown(f"_{goal['description']}_")
+            preview = goal["description"][:120] + ("…" if len(goal["description"]) > 120 else "")
+            st.markdown(
+                f"<div style='color:#a1a1aa; font-size:0.9rem; margin: 4px 0 8px;'>"
+                f"<em>{preview}</em></div>",
+                unsafe_allow_html=True,
+            )
 
-        # Action buttons
-        _render_goal_actions(goal, partner)
+        _render_actions(goal, partner)
 
 
-def _render_goal_actions(goal, partner):
+def _render_actions(goal, partner):
     if goal["status"] == "completed":
         if goal.get("completed_at"):
-            st.caption(f"Completed on {goal['completed_at'][:10]}")
+            st.caption(f"🏆 Completed {goal['completed_at'][:10]}")
         return
-
-    col1, col2, col3 = st.columns([2, 2, 1])
 
     if goal["status"] == "pending":
         already_voted = has_partner_voted(goal["id"], partner["id"])
-        votes = get_votes_for_goal(goal["id"])
-        vote_names = [f"{v['partner_avatar']} {v['partner_name']}" for v in votes if v["vote"] == "approve"]
-
-        if vote_names:
-            st.caption(f"Approved by: {', '.join(vote_names)}")
-
-        with col1:
+        c1, c2, c3 = st.columns([2, 2, 1])
+        with c1:
             if already_voted:
-                st.button("✅ You voted", key=f"voted_{goal['id']}", disabled=True)
+                st.button("✓ Voted", key=f"v_{goal['id']}", disabled=True, use_container_width=True)
             else:
-                if st.button("👍 Approve", key=f"approve_{goal['id']}"):
+                if st.button("👍 Approve", key=f"a_{goal['id']}", use_container_width=True, type="primary"):
                     vote_on_goal(goal["id"], partner["id"], "approve")
                     st.rerun()
-        with col2:
+        with c2:
             if not already_voted:
-                if st.button("👎 Skip", key=f"skip_{goal['id']}"):
+                if st.button("👎 Skip", key=f"s_{goal['id']}", use_container_width=True):
                     vote_on_goal(goal["id"], partner["id"], "skip")
+                    st.rerun()
+        with c3:
+            if goal["added_by"] == partner["id"]:
+                if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
+                    delete_goal(goal["id"])
                     st.rerun()
 
     elif goal["status"] == "approved":
-        with col1:
-            if st.button("🎉 Mark Complete!", key=f"complete_{goal['id']}"):
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            if st.button("🎉 We did it!", key=f"c_{goal['id']}", use_container_width=True, type="primary"):
                 complete_goal(goal["id"])
                 st.balloons()
                 st.rerun()
-
-    with col3:
-        if goal["added_by"] == partner["id"]:
-            if st.button("🗑️", key=f"delete_{goal['id']}", help="Delete this goal"):
-                delete_goal(goal["id"])
-                st.rerun()
+        with c2:
+            if goal["added_by"] == partner["id"]:
+                if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
+                    delete_goal(goal["id"])
+                    st.rerun()
