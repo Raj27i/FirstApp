@@ -182,6 +182,9 @@ def _render_goal_card(goal, partner):
     }.get(goal["status"], goal["status"])
     type_icon = "🤝" if goal["goal_type"] == "together" else "🏃"
 
+    desc = goal.get("description") or ""
+    preview = (desc[:120] + "…") if len(desc) > 120 else desc
+
     with st.container(border=True):
         st.markdown(
             f"<div style='font-size:2.5rem; line-height:1; margin-bottom:4px;'>"
@@ -194,13 +197,12 @@ def _render_goal_card(goal, partner):
             f"by {goal['partner_avatar']} {goal['partner_name']}"
         )
 
-        if goal["description"]:
-            preview = goal["description"][:120] + ("…" if len(goal["description"]) > 120 else "")
-            st.markdown(
-                f"<div style='color:#a1a1aa; font-size:0.9rem; margin: 4px 0 8px;'>"
-                f"<em>{preview}</em></div>",
-                unsafe_allow_html=True,
-            )
+        # Always reserve description space so cards align even when empty
+        st.markdown(
+            f"<div style='color:#a1a1aa; font-size:0.9rem; min-height:42px; "
+            f"margin: 6px 0 10px; font-style:italic;'>{preview}</div>",
+            unsafe_allow_html=True,
+        )
 
         _render_actions(goal, partner)
 
