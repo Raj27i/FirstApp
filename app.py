@@ -225,11 +225,10 @@ with hcol3:
 st.markdown("")
 
 # --- Top tabs ---
-tab_home, tab_goals, tab_date, tab_stats = st.tabs([
+tab_home, tab_goals, tab_dash = st.tabs([
     "🏠  Home",
     "📝  Dreams",
-    "🎲  Date Night",
-    "📖  Memories",
+    "📊  Dashboard",
 ])
 
 with tab_home:
@@ -240,10 +239,6 @@ with tab_goals:
     from pages.bucket_list import render as render_goals
     render_goals()
 
-with tab_date:
-    from pages.date_night import render as render_date
-    render_date()
-
-with tab_stats:
-    from pages.dashboard import render as render_stats
-    render_stats()
+with tab_dash:
+    from pages.dashboard import render as render_dash
+    render_dash()
