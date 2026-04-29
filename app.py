@@ -43,6 +43,19 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #fce4ec 0%, #fff0f5 50%, #ffffff 100%);
     }
+    /* Force readable dark text in the pink sidebar regardless of theme */
+    section[data-testid="stSidebar"], section[data-testid="stSidebar"] * {
+        color: #2c1810 !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button {
+        color: #2c1810 !important;
+        background: #ffffff !important;
+        border: 1px solid #f8bbd0 !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: #fce4ec !important;
+        border-color: #ec407a !important;
+    }
     /* Nicer buttons */
     .stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #ec407a, #e91e63);
