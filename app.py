@@ -70,9 +70,28 @@ st.markdown("""
     [data-testid="stVerticalBlockBorderWrapper"] {
         background: var(--bg-card);
         border-radius: 14px;
+        height: 100%;
     }
     [data-testid="stVerticalBlockBorderWrapper"] > div {
         border-color: var(--border) !important;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {
+        height: 100%;
+    }
+    /* Push action buttons to the bottom of each card */
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"]:last-child {
+        margin-top: auto;
+    }
+    /* Make columns containing cards equal height */
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        display: flex;
+        flex-direction: column;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {
+        height: 100%;
     }
 
     /* Buttons */

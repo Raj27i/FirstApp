@@ -211,36 +211,56 @@ def _render_actions(goal, partner):
             st.caption(f"🏆 Completed {goal['completed_at'][:10]}")
         return
 
+    is_owner = goal["added_by"] == partner["id"]
+
     if goal["status"] == "pending":
         already_voted = has_partner_voted(goal["id"], partner["id"])
-        c1, c2, c3 = st.columns([2, 2, 1])
-        with c1:
-            if already_voted:
-                st.button("✓ Voted", key=f"v_{goal['id']}", disabled=True, use_container_width=True)
-            else:
-                if st.button("👍 Approve", key=f"a_{goal['id']}", use_container_width=True, type="primary"):
+
+        if already_voted:
+            # Voted state: full-width disabled badge + delete (if owner)
+            cols = st.columns([4, 1]) if is_owner else [st.container()]
+            with cols[0]:
+                st.button(
+                    "✓ You voted",
+                    key=f"v_{goal['id']}",
+                    disabled=True,
+                    use_container_width=True,
+                )
+            if is_owner:
+                with cols[1]:
+                    if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
+                        delete_goal(goal["id"])
+                        st.rerun()
+        else:
+            # Not voted: Approve | Skip | (Delete if owner)
+            ratios = [2, 2, 1] if is_owner else [1, 1]
+            cols = st.columns(ratios)
+            with cols[0]:
+                if st.button("👍 Approve", key=f"a_{goal['id']}",
+                             use_container_width=True, type="primary"):
                     vote_on_goal(goal["id"], partner["id"], "approve")
                     st.rerun()
-        with c2:
-            if not already_voted:
+            with cols[1]:
                 if st.button("👎 Skip", key=f"s_{goal['id']}", use_container_width=True):
                     vote_on_goal(goal["id"], partner["id"], "skip")
                     st.rerun()
-        with c3:
-            if goal["added_by"] == partner["id"]:
-                if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
-                    delete_goal(goal["id"])
-                    st.rerun()
+            if is_owner:
+                with cols[2]:
+                    if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
+                        delete_goal(goal["id"])
+                        st.rerun()
 
     elif goal["status"] == "approved":
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            if st.button("🎉 We did it!", key=f"c_{goal['id']}", use_container_width=True, type="primary"):
+        ratios = [4, 1] if is_owner else [1]
+        cols = st.columns(ratios)
+        with cols[0]:
+            if st.button("🎉 We did it!", key=f"c_{goal['id']}",
+                         use_container_width=True, type="primary"):
                 complete_goal(goal["id"])
                 st.balloons()
                 st.rerun()
-        with c2:
-            if goal["added_by"] == partner["id"]:
+        if is_owner:
+            with cols[1]:
                 if st.button("🗑", key=f"d_{goal['id']}", use_container_width=True):
                     delete_goal(goal["id"])
                     st.rerun()
